@@ -1,0 +1,12 @@
+import sqlite3
+connection = sqlite3.connect('Base.db')
+cursor = connection.cursor()
+cursor.execute('''CREATE TABLE IF NOT EXISTS Users
+              (user_id INTEGER PRIMARY KEY AUTOINCREMENT, user_name TEXT, user_password TEXT)''')
+connection.commit()
+cursor.execute('''CREATE TABLE IF NOT EXISTS groups
+              (group_id INTEGER PRIMARY KEY AUTOINCREMENT, group_name TEXT)''')
+connection.commit()
+cursor.execute('''CREATE TABLE IF NOT EXISTS files
+              (uuid TEXT PRIMARY KEY, virtual_path TEXT, created_at TEXT, owner_user_id INT, owner_group_id INT, mode INT)''')
+connection.commit()
