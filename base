@@ -1,0 +1,16 @@
+import sqlite3
+connection = sqlite3.connect('Users.db')
+cursor = connection.cursor()
+cursor.execute('''CREATE TABLE IF NOT EXISTS Users
+              (user_id INT, user_name TEXT, user_password TEXT)''')
+connection.commit()
+connection = sqlite3.connect('groups.db')
+cursor = connection.cursor()
+cursor.execute('''CREATE TABLE IF NOT EXISTS groups
+              (group_id INT, group_name TEXT)''')
+connection.commit()
+connection = sqlite3.connect('files.db')
+cursor = connection.cursor()
+cursor.execute('''CREATE TABLE IF NOT EXISTS files
+              (uuid INT, virtual_path TEXT, created_at TEXT, owner_user_id INT, owner_group_id INT, mode INT)''')
+connection.commit()
