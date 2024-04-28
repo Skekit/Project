@@ -1,0 +1,3 @@
+instructions:
+to start:
+write "uvicorn controllers:app --reload" in powershell
