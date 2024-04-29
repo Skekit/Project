@@ -77,15 +77,15 @@ def Have_access_2(mode, owner_user_id, username, user_id, owner_group_id,cursor:
         else:
                 return False
 
-def Have_access_1(mode, owner_user_id, username, user_id, owner_group_id,cursor: sqlite3.Cursor):
-    if owner_user_id==user_id:
+def Have_access_1(mode, owner_user_id, user_id, owner_group_id,cursor: sqlite3.Cursor):
+    if str(owner_user_id)==str(user_id):
         if mode//100>0:
             return True
         else:
             return False
     else:
         if mode//10%10>0:
-            group = Group.getByUserName(username,cursor)
+            group = Group.getByUserId(user_id,cursor)
             if group is not None:
                 if group.id==owner_group_id:
                     return True

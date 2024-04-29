@@ -35,6 +35,7 @@ class User(FeaturedModel):
             return User(**cursor.fetchone())
         except TypeError as e:
             return None
+        
     @staticmethod
     def getById(id,cursor: sqlite3.Cursor):
         try:
@@ -84,6 +85,22 @@ class Group(FeaturedModel):
         #cursor.execute("""SELECT * FROM Connections WHERE user_id =?""", (user.id,))
         #group_id=cursor.fetchone()
         #cursor.execute("""SELECT * FROM groups WHERE id =?""", (group_id[0],))
+        group=Group(**res)
+        return group
+    
+
+    @staticmethod
+    def getByUserId(userId: str, cursor: sqlite3.Cursor) -> Optional["Group"]:
+        cursor.execute("""
+            select g.*
+            from Users u
+            join connections c on c.user_id = u.id
+            join groups g on g.id = c.group_id
+            where u.id = ?;
+        """, (userId,))
+        res = cursor.fetchone()
+        if res is None:
+            return None
         group=Group(**res)
         return group
         

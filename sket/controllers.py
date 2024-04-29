@@ -1,7 +1,12 @@
 import os
 import sqlite3
-from fastapi import FastAPI, UploadFile, Form, Depends, HTTPException, status
+from fastapi import FastAPI, UploadFile, Form, Depends, HTTPException, status, Response, Cookie
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from uuid import uuid4 
+from time import time
+import re
 from starlette.responses import FileResponse
+from typing import Annotated, Mapping
 from models import  New_Connections, New_group, New_user, Get_file, User,File,Group
 from services import Create_connection,Create_group,Create_user,delete_connection,delete_file_by_name,Have_access_1,Have_access_2,password_correct,new_file,get_files_names,get_files_names_by_user
 app = FastAPI()
@@ -14,6 +19,70 @@ def get_db():
     finally:
         connection.commit()
         connection.close()
+
+sec = HTTPBasic()
+
+COOKIE_ALIAS = "SKET"
+
+session_storage: Mapping[str, str] = dict()
+
+def check_auth(credentials: Annotated[HTTPBasicCredentials, Depends(sec)], db: sqlite3.Cursor = Depends(get_db)):
+    login = credentials.username
+    passw = credentials.password
+    exc = HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or passw", headers={"WWW_Authenticate": "Basic"})
+    fetched_user = User.getByName(db, login)
+
+    if fetched_user is None:
+        raise exc
+    is_correct = password_correct(fetched_user.password, fetched_user.salt, passw)
+    if not is_correct:
+        raise exc
+    
+    return fetched_user.id
+    
+
+
+def set_session(id):
+    sessid = uuid4().hex
+    while sessid in session_storage.keys():
+        sessid = uuid4().hex
+    session_storage[sessid] = str(id)
+    return sessid
+
+
+def get_session(sessid: str = Cookie(default=None, alias=COOKIE_ALIAS)):
+    print(sessid)
+    exc = HTTPException(status.HTTP_403_FORBIDDEN, detail="Access forbidden")
+    if not sessid:
+        raise exc
+    if re.match(r'[a-f0-9]{32}', sessid) is None:
+        raise exc
+    sess = session_storage.get(sessid)
+    if sess is None:
+        raise exc
+    
+    return sess
+
+
+    
+def rem_session(sess_data: str = Depends(get_session), sessid: str = Cookie(default=None, alias=COOKIE_ALIAS)):
+    del session_storage[sessid]
+    return sess_data
+
+@app.post('/auth/login')
+def login(response: Response, auth: Annotated[str, Depends(check_auth)]):
+    session_id = set_session(auth)
+    response.set_cookie(COOKIE_ALIAS, session_id, expires=300)
+    return {"success": True}
+
+@app.post('/auth/check')
+def check(session_id: str = Depends(get_session)):
+    return {"success": True, "session": session_id}
+
+@app.post('/auth/logout')
+def login(response: Response, dropped: Annotated[str, Depends(rem_session)]):
+    response.delete_cookie(COOKIE_ALIAS)
+    return {"success": True, "deleted": dropped}
 
 @app.post("/upload_file")
 async def create_upload_file(thisfile: UploadFile,username: str = Form(), mode: int = Form(),user_password:str=Form(), cursor: sqlite3.Cursor = Depends(get_db)):
@@ -111,6 +180,28 @@ async def get_file(data:Get_file, cursor: sqlite3.Cursor = Depends(get_db)):
                 
             else:
                 raise HTTPException(status.HTTP_403_FORBIDDEN, detail={"message": "no memory of password?"})
+            
+    except sqlite3.Error as error:
+        print("Ошибка при работе с SQLite", error)
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail='Сервис временно недоступен')
+    
+
+@app.post("/get_file1")
+async def get_file1(filename: str, auth: str = Depends(get_session), cursor: sqlite3.Cursor = Depends(get_db)):
+    try:
+        # fetched_user = User.getByName(cursor,data.user_name)
+        fetched_file=File.getByName(filename,cursor)
+        
+        if fetched_file is None:
+            return {"message": "this file is not exist"}
+        else:
+            owner_user=User.getById(fetched_file.owner_user_id,cursor)
+            
+            if Have_access_1(fetched_file.mode,owner_user.id,auth,fetched_file.owner_group_id,cursor):
+                return FileResponse(f"files/{owner_user.name}/{filename}",media_type="application/octet-stream",filename=f"{filename}")
+            else:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"message": "no access?"}) 
+                
             
     except sqlite3.Error as error:
         print("Ошибка при работе с SQLite", error)
