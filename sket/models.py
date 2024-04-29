@@ -68,11 +68,18 @@ class Group(FeaturedModel):
     name:str
     @staticmethod
     def getByUserName(user_name, cursor: sqlite3.Cursor):
-        cursor.execute("""SELECT * FROM Users WHERE name =?""", (user_name,))
-        user=User(**cursor.fetchone())
-        cursor.execute("""SELECT * FROM Connections WHERE user_id =?""", (user.id,))
-        group_id=cursor.fetchone()
-        cursor.execute("""SELECT * FROM groups WHERE id =?""", (group_id[0],))
+        cursor.execute("""
+            select g.*
+            from Users u
+            join connections c on c.user_id = u.id
+            join groups g on g.id = c.group_id
+            where u.name = ?;
+        """, (user_name,))
+        #cursor.execute("""SELECT * FROM Users WHERE name =?""", (user_name,))
+        #user=User(**cursor.fetchone())
+        #cursor.execute("""SELECT * FROM Connections WHERE user_id =?""", (user.id,))
+        #group_id=cursor.fetchone()
+        #cursor.execute("""SELECT * FROM groups WHERE id =?""", (group_id[0],))
         group=Group(**cursor.fetchone())
         if group!=None:
             return(group)
