@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from fastapi import FastAPI, UploadFile, Form, Depends
+from fastapi import FastAPI, UploadFile, Form, Depends, HTTPException, status
 from starlette.responses import FileResponse
 from models import  New_Connections, New_group, New_user, Get_file, User,File,Group
 from services import Create_connection,Create_group,Create_user,delete_connection,delete_file_by_name,Have_access_1,Have_access_2,password_correct,new_file,get_files_names,get_files_names_by_user
@@ -97,21 +97,24 @@ async def get_file(data:Get_file, cursor: sqlite3.Cursor = Depends(get_db)):
     try:
         fetched_user = User.getByName(cursor,data.user_name)
         fetched_file=File.getByName(data.file_name,cursor)
+        
         if fetched_file is None:
             return {"message": "this file is not exist"}
         else:
             owner_user=User.getById(fetched_file.owner_user_id,cursor)
+            
             if password_correct(fetched_user.password,fetched_user.salt,data.password):
-                if fetched_file.owner_user_id==fetched_user.id:
-                    if Have_access_1(fetched_file.mode,owner_user.id,data.user_name,fetched_user.id,fetched_file.owner_group_id,cursor):
-                        return FileResponse(f"files/{owner_user.name}/{data.file_name}",media_type="application/octet-stream",filename=f"{data.file_name}")
-                    else:
-                        return {"message": "no access?"}
+                if Have_access_1(fetched_file.mode,owner_user.id,data.user_name,fetched_user.id,fetched_file.owner_group_id,cursor):
+                    return FileResponse(f"files/{owner_user.name}/{data.file_name}",media_type="application/octet-stream",filename=f"{data.file_name}")
+                else:
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"message": "no access?"}) 
+                
             else:
-                return {"message": "no memory of password?"}
+                raise HTTPException(status.HTTP_403_FORBIDDEN, detail={"message": "no memory of password?"})
             
     except sqlite3.Error as error:
         print("Ошибка при работе с SQLite", error)
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail='Сервис временно недоступен')
 
 @app.post("/new_svyaz")
 def new_svyaz(data: New_Connections, cursor: sqlite3.Cursor = Depends(get_db)):

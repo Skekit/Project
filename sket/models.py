@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel
 import sqlite3
 
@@ -67,7 +68,7 @@ class Group(FeaturedModel):
     id:int
     name:str
     @staticmethod
-    def getByUserName(user_name, cursor: sqlite3.Cursor):
+    def getByUserName(user_name, cursor: sqlite3.Cursor) -> Optional["Group"]:
         cursor.execute("""
             select g.*
             from Users u
@@ -75,16 +76,17 @@ class Group(FeaturedModel):
             join groups g on g.id = c.group_id
             where u.name = ?;
         """, (user_name,))
+        res = cursor.fetchone()
+        if res is None:
+            return None
         #cursor.execute("""SELECT * FROM Users WHERE name =?""", (user_name,))
         #user=User(**cursor.fetchone())
         #cursor.execute("""SELECT * FROM Connections WHERE user_id =?""", (user.id,))
         #group_id=cursor.fetchone()
         #cursor.execute("""SELECT * FROM groups WHERE id =?""", (group_id[0],))
-        group=Group(**cursor.fetchone())
-        if group!=None:
-            return(group)
-        else:
-            return(-1)
+        group=Group(**res)
+        return group
+        
     @staticmethod
     def getByName(name, cursor: sqlite3.Cursor):
         try:

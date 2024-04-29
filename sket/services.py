@@ -85,14 +85,13 @@ def Have_access_1(mode, owner_user_id, username, user_id, owner_group_id,cursor:
             return False
     else:
         if mode//10%10>0:
-            group_id=Group.getByUserName(username,cursor)
-            if group_id==owner_group_id:
-                return True
-            else:
-                if mode%10>0:
+            group = Group.getByUserName(username,cursor)
+            if group is not None:
+                if group.id==owner_group_id:
                     return True
-                else:
-                    return False
+            
+            return bool(mode%10)
+            
         else:
                 return False
 

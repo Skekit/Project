@@ -1,2 +1,4 @@
 sket/__pycache__/
+sket/venv
+files/
 *.pyc
