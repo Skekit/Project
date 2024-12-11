@@ -8,7 +8,7 @@ import re
 from starlette.responses import FileResponse
 from typing import Annotated, Mapping
 from models import  New_Connections, New_group, New_user, Get_file, User,File,Group
-from services import Create_connection,Create_group,Create_user,delete_connection,delete_file_by_name,Have_access_1,Have_access_2,password_correct,new_file,get_files_names,get_files_names_by_user
+from services import Create_connection,Create_group,Create_user,delete_connection,delete_file_by_name,Have_access_1,Have_access,password_correct,new_file,get_files_names,get_files_names_by_user
 app = FastAPI()
 
 def get_db():
@@ -85,16 +85,16 @@ def login(response: Response, dropped: Annotated[str, Depends(rem_session)]):
     return {"success": True, "deleted": dropped}
 
 @app.post("/upload_file")
-async def create_upload_file(thisfile: UploadFile,username: str = Form(), mode: int = Form(),user_password:str=Form(), cursor: sqlite3.Cursor = Depends(get_db)):
+async def create_upload_file(thisfile: UploadFile,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], mode: int = Form(), cursor: sqlite3.Cursor = Depends(get_db)):
     fetched_file=File.getByName(thisfile.filename,cursor)
     if fetched_file is None:
-        fetched_user = User.getByName(cursor,username)
-        if password_correct(fetched_user.password,fetched_user.salt,user_password):
-            new_file(username,mode,thisfile.filename,cursor)
+        fetched_user = User.getByName(cursor,credentials.username)
+        if password_correct(fetched_user.password,fetched_user.salt,credentials.password):
+            new_file(credentials.username,mode,thisfile.filename,cursor)
             cur_path=os.getcwd()
-            save_path=os.path.join(f"{cur_path}",f"files\\{username}\\{thisfile.filename}")
-            if not os.path.exists(f"{cur_path}\\files\\{username}\\"):
-                os.makedirs(f"{cur_path}\\files\\{username}\\")
+            save_path=os.path.join(f"{cur_path}",f"files\\{credentials.username}\\{thisfile.filename}")
+            if not os.path.exists(f"{cur_path}\\files\\{credentials.username}\\"):
+                os.makedirs(f"{cur_path}\\files\\{credentials.username}\\")
             with open(save_path, "wb") as f:
                 f.write(await thisfile.read())
         else:
@@ -112,8 +112,10 @@ def new_user(data:New_user, cursor: sqlite3.Cursor = Depends(get_db)):
         return {"message": "this user already exist"}
 
 @app.post("/rewrite_file")
-async def rewrite_file(thisfile: UploadFile,username: str = Form(),user_password:str=Form(), cursor: sqlite3.Cursor = Depends(get_db)):
+async def rewrite_file(thisfile: UploadFile,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], cursor: sqlite3.Cursor = Depends(get_db)):
     try:
+        username=credentials.username
+        user_password=credentials.password
         fetched_user = User.getByName(cursor,username)
         fetched_file=File.getByName(thisfile.filename,cursor)
         if fetched_file is None:
@@ -123,7 +125,7 @@ async def rewrite_file(thisfile: UploadFile,username: str = Form(),user_password
             if password_correct(fetched_user.password,fetched_user.salt,user_password):
                 cur_path=os.getcwd()
                 save_path=os.path.join(f"{cur_path}\\",f"files\\{owner_user.name}\\{fetched_file.name}")
-                if Have_access_2(fetched_file.mode,owner_user.id,username,fetched_user.id,fetched_file.owner_group_id,cursor):
+                if Have_access(fetched_file.mode,owner_user.id,username,fetched_user.id,fetched_file.owner_group_id,cursor,2):
                     with open(save_path, "wb") as f:
                         f.write(await thisfile.read())
                     return {"massage":"succesful"}
@@ -136,18 +138,20 @@ async def rewrite_file(thisfile: UploadFile,username: str = Form(),user_password
         print("Ошибка при работе с SQLite", error)
 
 @app.post("/delete_file")
-def delete_file(data:Get_file, cursor: sqlite3.Cursor = Depends(get_db)):
+def delete_file(data:Get_file,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], cursor: sqlite3.Cursor = Depends(get_db)):
     try:
-        fetched_user = User.getByName(cursor,data.user_name)
+        user_name=credentials.username
+        password=credentials.password
+        fetched_user = User.getByName(cursor,user_name)
         fetched_file=File.getByName(data.file_name,cursor)
         if fetched_file is None:
             return {"massage":"this file is not exist"}
         else:
             owner_user=User.getById(fetched_file.owner_user_id,cursor)
-            if password_correct(fetched_user.password,fetched_user.salt,data.password):
+            if password_correct(fetched_user.password,fetched_user.salt,password):
                 cur_path=os.getcwd()
                 save_path=os.path.join(f"{cur_path}\\",f"files\\{owner_user.name}\\{fetched_file.name}")
-                if Have_access_2(fetched_file.mode,owner_user.id,data.user_name,fetched_user.id,fetched_file.owner_group_id,cursor):
+                if Have_access(fetched_file.mode,owner_user.id,user_name,fetched_user.id,fetched_file.owner_group_id,cursor,2):
                     with open(save_path, "wb") as f:
                         os.remove(save_path)
                     delete_file_by_name(data.file_name)
@@ -161,10 +165,12 @@ def delete_file(data:Get_file, cursor: sqlite3.Cursor = Depends(get_db)):
         print("Ошибка при работе с SQLite", error)
 
 
-@app.post("/get_file")
-async def get_file(data:Get_file, cursor: sqlite3.Cursor = Depends(get_db)):
+#@app.post("/get_file1")
+async def get_file1(data:Get_file,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], cursor: sqlite3.Cursor = Depends(get_db)):
     try:
-        fetched_user = User.getByName(cursor,data.user_name)
+        user_name=credentials.username
+        password=credentials.password
+        fetched_user = User.getByName(cursor,user_name)
         fetched_file=File.getByName(data.file_name,cursor)
         
         if fetched_file is None:
@@ -172,8 +178,8 @@ async def get_file(data:Get_file, cursor: sqlite3.Cursor = Depends(get_db)):
         else:
             owner_user=User.getById(fetched_file.owner_user_id,cursor)
             
-            if password_correct(fetched_user.password,fetched_user.salt,data.password):
-                if Have_access_1(fetched_file.mode,owner_user.id,data.user_name,fetched_user.id,fetched_file.owner_group_id,cursor):
+            if password_correct(fetched_user.password,fetched_user.salt,password):
+                if Have_access(fetched_file.mode,owner_user.id,user_name,fetched_user.id,fetched_file.owner_group_id,cursor,1):
                     return FileResponse(f"files/{owner_user.name}/{data.file_name}",media_type="application/octet-stream",filename=f"{data.file_name}")
                 else:
                     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"message": "no access?"}) 
@@ -186,8 +192,8 @@ async def get_file(data:Get_file, cursor: sqlite3.Cursor = Depends(get_db)):
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail='Сервис временно недоступен')
     
 
-@app.post("/get_file1")
-async def get_file1(filename: str, auth: str = Depends(get_session), cursor: sqlite3.Cursor = Depends(get_db)):
+@app.post("/get_file")
+async def get_file(filename: str,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], auth: str = Depends(get_session), cursor: sqlite3.Cursor = Depends(get_db)):
     try:
         # fetched_user = User.getByName(cursor,data.user_name)
         fetched_file=File.getByName(filename,cursor)
@@ -196,8 +202,8 @@ async def get_file1(filename: str, auth: str = Depends(get_session), cursor: sql
             return {"message": "this file is not exist"}
         else:
             owner_user=User.getById(fetched_file.owner_user_id,cursor)
-            
-            if Have_access_1(fetched_file.mode,owner_user.id,auth,fetched_file.owner_group_id,cursor):
+            user=User.getByName(cursor,credentials.username)
+            if Have_access_1(fetched_file.mode,owner_user.id,credentials.username,user.id,fetched_file.owner_group_id,cursor):
                 return FileResponse(f"files/{owner_user.name}/{filename}",media_type="application/octet-stream",filename=f"{filename}")
             else:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"message": "no access?"}) 
@@ -208,17 +214,13 @@ async def get_file1(filename: str, auth: str = Depends(get_session), cursor: sql
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail='Сервис временно недоступен')
 
 @app.post("/new_svyaz")
-def new_svyaz(data: New_Connections, cursor: sqlite3.Cursor = Depends(get_db)):
-    fetched_user = User.getByName(cursor,data.user_name)
-    if password_correct(fetched_user.password,fetched_user.salt,data.user_password):
-        
-        if Create_connection(data.user_name,data.group_name,cursor):
-            return {"massage":"succesful"}
-        else:
-            return {"message": "this group not exist"}
+def new_svyaz(data: New_Connections,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], cursor: sqlite3.Cursor = Depends(get_db)):
+    user_name=credentials.username
+    if Create_connection(user_name,data.group_name,cursor):
+        return {"massage":"succesful"}
     else:
-        
-        return {"message": "no memory of password?"}
+        return {"message": "this group not exist"}
+    
 
 
 @app.post("/new_group")
@@ -229,32 +231,26 @@ def new_group(data:New_group, cursor: sqlite3.Cursor = Depends(get_db)):
         return {"massage":"this group already exist"}
     
 @app.post("/disconnect")
-def disconnect(data:New_Connections, cursor: sqlite3.Cursor = Depends(get_db)):
-    fetched_user = User.getByName(cursor,data.user_name)
-    if password_correct(fetched_user.password,fetched_user.salt,data.user_password):
-        if delete_connection(data.group_name,fetched_user.id,cursor):
-            return {"massage":"succesful"}
-        else:
-            return {"massage":"this group not exist"}
+def disconnect(data:New_Connections,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], cursor: sqlite3.Cursor = Depends(get_db)):
+    fetched_user = User.getByName(cursor,credentials.username)
+    if delete_connection(data.group_name,fetched_user.id,cursor):
+        return {"massage":"succesful"}
     else:
-        return {"message": "no memory of password?"}
+        return {"massage":"this group not exist"}
+    
 
 @app.get("/get_all_files_names")
-def get_all_files_names( cursor: sqlite3.Cursor = Depends(get_db)):
-    names=get_files_names(cursor)
-    massage_string=''
-    try:
-        names=names.split()
-    except AttributeError as e:
-        all_ok=1
-    for name in names:
-        massage_string+=(f'{name} \n ')
+def get_all_files_names(credentials: Annotated[HTTPBasicCredentials, Depends(sec)], cursor: sqlite3.Cursor = Depends(get_db)):
+    files=get_files_names(cursor,credentials.username)
+    massage_string='this is all files that you can see: '
+    for file in files:
+        massage_string+=(f'{file} \n ')
     return {"message": f"{massage_string}"}
 
 @app.get("/get_files_names_from_{name}")
-def get_files_names_from_user(name:str, cursor: sqlite3.Cursor = Depends(get_db)):
+def get_files_names_from_user(name:str,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], cursor: sqlite3.Cursor = Depends(get_db)):
     names=get_files_names_by_user(name,cursor)
-    massage_string=''
+    massage_string=f'this is all files that you can see from {name}: '
     try:
         names=names.split()
     except AttributeError as e:
