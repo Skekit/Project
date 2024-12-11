@@ -1,4 +1,3 @@
-from typing import Optional
 from pydantic import BaseModel
 import sqlite3
 
@@ -35,7 +34,6 @@ class User(FeaturedModel):
             return User(**cursor.fetchone())
         except TypeError as e:
             return None
-        
     @staticmethod
     def getById(id,cursor: sqlite3.Cursor):
         try:
@@ -45,9 +43,8 @@ class User(FeaturedModel):
             return None
 
 class New_Connections(FeaturedModel):
-    user_name:str
     group_name:str
-    user_password:str
+    
 
 class New_user(FeaturedModel):
     name:str
@@ -61,49 +58,23 @@ class File_param(FeaturedModel):
     mode:int
 
 class Get_file(FeaturedModel):
-    user_name:str
-    password:str
     file_name:str
 
 class Group(FeaturedModel):
     id:int
     name:str
     @staticmethod
-    def getByUserName(user_name, cursor: sqlite3.Cursor) -> Optional["Group"]:
-        cursor.execute("""
-            select g.*
-            from Users u
-            join connections c on c.user_id = u.id
-            join groups g on g.id = c.group_id
-            where u.name = ?;
-        """, (user_name,))
-        res = cursor.fetchone()
-        if res is None:
-            return None
-        #cursor.execute("""SELECT * FROM Users WHERE name =?""", (user_name,))
-        #user=User(**cursor.fetchone())
-        #cursor.execute("""SELECT * FROM Connections WHERE user_id =?""", (user.id,))
-        #group_id=cursor.fetchone()
-        #cursor.execute("""SELECT * FROM groups WHERE id =?""", (group_id[0],))
-        group=Group(**res)
-        return group
-    
-
-    @staticmethod
-    def getByUserId(userId: str, cursor: sqlite3.Cursor) -> Optional["Group"]:
-        cursor.execute("""
-            select g.*
-            from Users u
-            join connections c on c.user_id = u.id
-            join groups g on g.id = c.group_id
-            where u.id = ?;
-        """, (userId,))
-        res = cursor.fetchone()
-        if res is None:
-            return None
-        group=Group(**res)
-        return group
-        
+    def getByUserName(user_name, cursor: sqlite3.Cursor):
+        cursor.execute("""SELECT * FROM Users WHERE name =?""", (user_name,))
+        user=User(**cursor.fetchone())
+        cursor.execute("""SELECT * FROM Connections WHERE user_id =?""", (user.id,))
+        group_id=cursor.fetchone()
+        cursor.execute("""SELECT * FROM groups WHERE id =?""", (group_id[0],))
+        group=Group(**cursor.fetchone())
+        if group!=None:
+            return(group)
+        else:
+            return(-1)
     @staticmethod
     def getByName(name, cursor: sqlite3.Cursor):
         try:
