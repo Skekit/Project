@@ -58,40 +58,41 @@ def Create_user(name,password, cursor: sqlite3.Cursor):
     cursor.execute('''INSERT INTO Users( name, password, salt)
             VALUES( ?, ?, ?)''', ( name, hashed_password, salt))
 
-def Have_access_2(mode, owner_user_id, username, user_id, owner_group_id,cursor: sqlite3.Cursor):
+def Have_access(mode, owner_user_id, username, user_id, owner_group_id,cursor: sqlite3.Cursor,level_of_access):
     if owner_user_id==user_id:
-        if mode//100>1:
+        if mode//100>=level_of_access:
             return True
         else:
             return False
     else:
-        if mode//10%10>1:
+        if mode//10%10>=level_of_access:
             group_id=Group.getByUserName(username,cursor)
             if group_id==owner_group_id:
                 return True
             else:
-                if mode%10>1:
+                if mode%10>=level_of_access:
                     return True
                 else:
                     return False
         else:
                 return False
 
-def Have_access_1(mode, owner_user_id, user_id, owner_group_id,cursor: sqlite3.Cursor):
-    if str(owner_user_id)==str(user_id):
+def Have_access_1(mode, owner_user_id, username, user_id, owner_group_id,cursor: sqlite3.Cursor):
+    if owner_user_id==user_id:
         if mode//100>0:
             return True
         else:
             return False
     else:
         if mode//10%10>0:
-            group = Group.getByUserId(user_id,cursor)
-            if group is not None:
-                if group.id==owner_group_id:
+            group_id=Group.getByUserName(username,cursor)
+            if group_id==owner_group_id:
+                return True
+            else:
+                if mode%10>0:
                     return True
-            
-            return bool(mode%10)
-            
+                else:
+                    return False
         else:
                 return False
 
@@ -134,28 +135,34 @@ def delete_connection(group_name,user_id,cursor: sqlite3.Cursor):
     except TypeError as e:
         return False
 
-def get_files_names(cursor: sqlite3.Cursor):
+def get_files_names(cursor: sqlite3.Cursor,username):
     try:
-        names=[]
+        user=User.getByName(cursor,username)
+        
+        files=[]
         cursor.execute("SELECT * FROM files")
-        files=cursor.fetchall()
-        for file in files:
+        raw_files=cursor.fetchall()
+        for file in raw_files:
             file=File(**file)
-            names.append(file.name)
-        return names
+            if Have_access(file.mode,file.owner_user_id,username,user.id,file.owner_group_id,cursor,1):
+                files.append(file.name)
+        return files
     except TypeError as e:
-        return f"error {e}"
+        print(e)
+        return ""
     
-def get_files_names_by_user(name,cursor: sqlite3.Cursor):
+def get_files_names_by_user(owner_name,cursor: sqlite3.Cursor,username):
     try:
-        user=User.getByName(cursor,name)
-        names=[]
-        cursor.execute("SELECT * FROM files WHERE owner_user_id = ?",(user.id,))
-        files=cursor.fetchall()
-        for file in files:
+        owner_user=User.getByName(cursor,owner_name)
+        user=User.getByName(cursor,username)
+        files=[]
+        cursor.execute("SELECT * FROM files WHERE owner_user_id = ?",(owner_user.id,))
+        raw_files=cursor.fetchall()
+        for file in raw_files:
             file=File(**file)
-            names.append(file.name)
-        return names
+            if Have_access(file.mode,file.owner_user_id,username,user.id,file.owner_group_id,cursor,1):
+                files.append(file.name)
+        return files
     except TypeError as e:
         return f"error {e}"
 
