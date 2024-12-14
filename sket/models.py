@@ -28,7 +28,7 @@ class User(FeaturedModel):
     password:str
     salt:bytes
     @staticmethod
-    def getByName(cursor: sqlite3.Cursor, username: str):
+    def getByName(cursor: sqlite3.Cursor,username: str):
         try:
             cursor.execute("""SELECT * FROM Users WHERE name = ?""", ((username,)))
             return User(**cursor.fetchone())
@@ -68,13 +68,14 @@ class Group(FeaturedModel):
         cursor.execute("""SELECT * FROM Users WHERE name =?""", (user_name,))
         user=User(**cursor.fetchone())
         cursor.execute("""SELECT * FROM Connections WHERE user_id =?""", (user.id,))
-        group_id=cursor.fetchone()
-        cursor.execute("""SELECT * FROM groups WHERE id =?""", (group_id[0],))
-        group=Group(**cursor.fetchone())
-        if group!=None:
-            return(group)
+        group=cursor.fetchone()
+        cursor.execute("""SELECT * FROM groups WHERE id =?""", (group[1],))
+        #group=Group(**cursor.fetchone())
+        temp = cursor.fetchone()
+        if temp != None:
+            return(Group(**temp))
         else:
-            return(-1)
+            return(None)
     @staticmethod
     def getByName(name, cursor: sqlite3.Cursor):
         try:
