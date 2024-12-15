@@ -85,12 +85,12 @@ def login(response: Response, dropped: Annotated[str, Depends(rem_session)]):
     return {"success": True, "deleted": dropped}
 
 @app.post("/upload_file")
-async def create_upload_file(thisfile: UploadFile,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], mode: int = Form(), cursor: sqlite3.Cursor = Depends(get_db)):
+async def create_upload_file(thisfile: UploadFile,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], mode: int = Form(), group: str = Form(), cursor: sqlite3.Cursor = Depends(get_db)):
     fetched_file=File.getByName(thisfile.filename,cursor)
     if fetched_file is None:
         fetched_user = User.getByName(cursor,credentials.username)
         if password_correct(fetched_user.password,fetched_user.salt,credentials.password):
-            new_file(credentials.username,mode,thisfile.filename,cursor)
+            new_file(credentials.username,mode,thisfile.filename,cursor,group)
             cur_path=os.getcwd()
             save_path=os.path.join(f"{cur_path}",f"files\\{credentials.username}\\{thisfile.filename}")
             if not os.path.exists(f"{cur_path}\\files\\{credentials.username}\\"):
@@ -250,7 +250,7 @@ def get_all_files_names(credentials: Annotated[HTTPBasicCredentials, Depends(sec
 
 @app.get("/get_files_names_from_{name}")
 def get_files_names_from_user(name:str,credentials: Annotated[HTTPBasicCredentials, Depends(sec)], cursor: sqlite3.Cursor = Depends(get_db)):
-    names=get_files_names_by_user(credentials.username,name,cursor)
+    names=get_files_names_by_user(credentials.username, name,cursor)
     massage_string=f'this is all files that you can see from {name}: '
     try:
         names=names.split()
@@ -259,3 +259,11 @@ def get_files_names_from_user(name:str,credentials: Annotated[HTTPBasicCredentia
     for name in names:
         massage_string+=(f'{name} \n ')
     return {"message": f"{massage_string}"}
+
+@app.get("/get_my_groups")
+def get_groups(credentials: Annotated[HTTPBasicCredentials, Depends(sec)],cursor: sqlite3.Cursor = Depends(get_db)):
+    group=Group.getByUserName(credentials.username,cursor)
+    list_of_groups=""
+    for t in group:
+        list_of_groups+=f'{t.name} \n'
+    return {"message": f'there are groups you taking part in: {list_of_groups}'}

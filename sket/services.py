@@ -42,14 +42,19 @@ def password_correct(hash,salt,password):
 
 
 
-def new_file(user_name,mode,file_name, cursor: sqlite3.Cursor ):
+def new_file(user_name,mode,file_name, cursor: sqlite3.Cursor ,group):
         dt_now = str(datetime.datetime.now())
         cursor.execute("""SELECT * FROM Users WHERE name = ?""", ((user_name,)))
         fetched_user = User(**cursor.fetchone())
         virtual_path = f"files/{user_name}/{file_name}"
-        group_id=Group.getByUserName(user_name,cursor)
-        cursor.execute('''INSERT INTO files( virtual_path, created_at, owner_user_id, owner_group_id, mode, name)
-                       VALUES( ?, ?, ?, ?, ?, ?)''', ( virtual_path, dt_now, fetched_user.id, group_id.id, mode, file_name))
+        groups=Group.getByUserName(user_name,cursor)
+        group=Group.getByName(group,cursor)
+        if group in groups:
+            cursor.execute('''INSERT INTO files( virtual_path, created_at, owner_user_id, owner_group_id, mode, name)
+                       VALUES( ?, ?, ?, ?, ?, ?)''', ( virtual_path, dt_now, fetched_user.id, group.id, mode, file_name))
+        else:
+            print("you are not in this group")
+            return False
         
         
 
@@ -71,8 +76,11 @@ def Have_access(mode, owner_user_id, username, user_id, owner_group_id,level_of_
             return False
     else:
         if mode//10%10>=level_of_access:
-            group_id=Group.getByUserName(username,cursor)
-            if group_id==owner_group_id:
+            groups=Group.getByUserName(username,cursor)
+            list_of_groups_id=[]
+            for i in groups:
+                list_of_groups_id.append(i.id)
+            if owner_group_id in list_of_groups_id:
                 return True
             else:
                 if mode%10>=level_of_access:

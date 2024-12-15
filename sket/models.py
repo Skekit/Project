@@ -68,12 +68,15 @@ class Group(FeaturedModel):
         cursor.execute("""SELECT * FROM Users WHERE name =?""", (user_name,))
         user=User(**cursor.fetchone())
         cursor.execute("""SELECT * FROM Connections WHERE user_id =?""", (user.id,))
-        group=cursor.fetchone()
-        cursor.execute("""SELECT * FROM groups WHERE id =?""", (group[1],))
-        #group=Group(**cursor.fetchone())
-        temp = cursor.fetchone()
-        if temp != None:
-            return(Group(**temp))
+        groups=cursor.fetchall()
+        list_of_groups=[]
+        for i in groups:
+            cursor.execute("""SELECT * FROM groups WHERE id =?""", (i[1],))
+            #group=Group(**cursor.fetchone())
+            temp = cursor.fetchone()
+            list_of_groups.append(Group(**temp))
+        if list_of_groups != None:
+            return(list_of_groups)
         else:
             return(None)
     @staticmethod
